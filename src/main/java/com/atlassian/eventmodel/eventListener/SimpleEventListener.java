@@ -5,9 +5,10 @@ import com.atlassian.eventmodel.event.Event;
 public class SimpleEventListener implements EventListener {
 
 	private String name;
-	
+
 	public void handleEvent(Event event) {
-		System.out.println("Listener " + this.getClass().getName() + " called for event " + event.getClass().getName() + " - " + event.getName());
+		System.out.println("Listener " + this.getClass().getName() + " called for event " + event.getClass().getName()
+				+ " - " + event.getName());
 	}
 
 	public Class<Event>[] getClasses() {
@@ -23,5 +24,4 @@ public class SimpleEventListener implements EventListener {
 		this.name = name;
 	}
 
-	
 }

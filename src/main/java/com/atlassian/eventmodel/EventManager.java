@@ -59,7 +59,7 @@ public class EventManager {
 		}
 
 		eventsForListener.remove(eventListener);
-		
+
 		listenersForAllEvents.remove(eventListener);
 
 	}
