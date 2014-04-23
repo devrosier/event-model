@@ -1,36 +1,36 @@
 package com.atlassian.eventmodel;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-
 import com.atlassian.eventmodel.event.Event;
 import com.atlassian.eventmodel.eventListener.EventListener;
 
 public class EventManager {
 
 	/**
-	 * list of all listeners registered
+	 * map of events registered for each listener (K event, V listeners)
 	 */
-	private Set<EventListener> allListeners = new HashSet<EventListener>();
+	private Map<Class<?>, Collection<EventListener>> listenersForEvent = new HashMap<Class<?>, Collection<EventListener>>();
 	/**
-	 * list of those listeners registered without an event class
+	 * map of classes registered for each listener (K listener, V events)
 	 */
-	private Set<EventListener> listenersForNoClass = new HashSet<EventListener>();
+	private Map<EventListener, Collection<Class<?>>> eventsForListener = new HashMap<EventListener, Collection<Class<?>>>();
 	/**
-	 * map of listeners registered for each class
+	 * list of listeners which respond to all event classes
 	 */
-	private Map<Class<?>, List<EventListener>> listenersForClass = new HashMap<Class<?>, List<EventListener>>();
+	private Collection<EventListener> listenersForAllEvents = new HashSet<EventListener>();
 
 	/**
 	 * Event manager allows to registration of listeners for events. An
 	 * EventListener may register to listen for 0 or N events by registering the
-	 * Event class. If 0 event classes are specified then it will listen for
-	 * ALL events. If N event classes are specified then it will listen for
-	 * just those events. Listeners may be deregistered when no longer
+	 * Event class. If 0 event classes are specified then it will listen for ALL
+	 * events. If N event classes are specified then it will listen for just
+	 * those events. Listeners may be deregistered when no longer
 	 * required/active.
 	 */
 	public EventManager() {
@@ -46,60 +46,61 @@ public class EventManager {
 	 */
 	public void deregisterListener(EventListener eventListener) {
 
-		// remove from classless listeners
-		listenersForNoClass.remove(eventListener);
-
-		// iterate listeners for each event class and remove this listener
-		for (List<EventListener> classEventListeners : listenersForClass
-				.values()) {
-			classEventListeners.remove(eventListener);
+		// retrieve event classes for this listener, and remove listener for
+		// each
+		Collection<Class<?>> eventClasses = eventsForListener.get(eventListener);
+		if (eventClasses != null) {
+			for (Class<?> eventClass : eventClasses) {
+				Collection<EventListener> registeredListeners = listenersForEvent.get(eventClass);
+				if (registeredListeners != null) {
+					registeredListeners.remove(eventListener);
+				}
+			}
 		}
 
-		// remove from all listeners
-		allListeners.remove(eventListener);
+		eventsForListener.remove(eventListener);
+		
+		listenersForAllEvents.remove(eventListener);
 
 	}
 
 	/**
 	 * Register a listener to listen for certain events or all events. If you
 	 * call this more than once for the same EventListener instance, then the
-	 * previous one will first be unregistered, and the new one will therefore completely supercede the previous one.
+	 * previous one will first be unregistered, and the new one will therefore
+	 * completely supersede the previous one.
 	 * 
 	 * @param eventListener
 	 * @param classes
 	 *            array of event classes that will publish to this listener
 	 */
-	public void registerListener(EventListener eventListener,
-			Class<?>[] eventClasses) {
+	public void registerListener(EventListener eventListener, Class<?>[] eventClasses) {
 
 		// remove previous registration of this listener to avoid conflict
 		deregisterListener(eventListener);
-		
-		// add the listener to master list
-		if (!allListeners.contains(eventListener)) {
-			allListeners.add(eventListener);
-		}
 
-		// if class array param is empty then add to NoClass list
-		if (eventClasses.length == 0) {
-			listenersForNoClass.add(eventListener);
-		}
-
-		// if class array param have entries then lodge listener against each event class
+		// populate the map of listeners for each class
 		for (Class<?> eventClass : eventClasses) {
-
-			List<EventListener> listenerList = listenersForClass
-					.get(eventClass);
-			if (listenerList == null) {
-				listenerList = new ArrayList<EventListener>();
-			}
-			listenerList.add(eventListener);
-			listenersForClass.put(eventClass, listenerList);
+			Collection<EventListener> listeners = listenersForEvent.get(eventClass);
+			if (listeners == null)
+				listeners = new HashSet<EventListener>();
+			listeners.add(eventListener);
+			listenersForEvent.put(eventClass, listeners);
 		}
+
+		// populate set of listeners to all classes
+		if (eventClasses.length == 0) {
+			listenersForAllEvents.add(eventListener);
+		}
+
+		// populate the map of classes for each listener (classes may be empty)
+		eventsForListener.put(eventListener, Arrays.asList(eventClasses));
+
 	}
 
 	/**
-	 * Publish will fire EventListener.eventHandler on each registered listener for this event
+	 * Publish will fire EventListener.eventHandler on each registered listener
+	 * for this event
 	 * 
 	 * @param event
 	 *            the event to send to registered EventListeners
@@ -112,27 +113,27 @@ public class EventManager {
 
 	/**
 	 * Return all EventListeners registered for a specific Event
+	 * 
 	 * @return A List of EventListeners
 	 */
 	public List<EventListener> getListenersForEvent(Event event) {
 
 		// the event class we are looking for
-		Class<?> eventClass = (Class<?>) event.getClass();
+		Class<?> eventClass = event.getClass();
 
 		// combined listener list (a) class specific and (b) broadcast
-		List<EventListener> combinedListenerList = new ArrayList<EventListener>();
+		List<EventListener> listeners = new ArrayList<EventListener>();
 
 		// the list of class specific listeners
-		List<EventListener> classSpecificListeners = listenersForClass
-				.get(eventClass);
+		Collection<EventListener> classSpecificListeners = listenersForEvent.get(eventClass);
 		if (classSpecificListeners != null) {
-			combinedListenerList.addAll(classSpecificListeners);
+			listeners.addAll(classSpecificListeners);
 		}
 
 		// and the listeners with no class
-		combinedListenerList.addAll(listenersForNoClass);
+		listeners.addAll(listenersForAllEvents);
 
-		return combinedListenerList;
+		return listeners;
 	}
 
 }

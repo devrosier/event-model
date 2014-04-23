@@ -17,6 +17,10 @@ public class TestEventManager extends TestCase {
 	static public EventListener EVENT_LISTENER_A = new SimpleEventListener();
 	static public EventListener EVENT_LISTENER_B = new SimpleEventListener();
 	static public EventListener EVENT_LISTENER_C = new SimpleEventListener();
+	static public EventListener EVENT_LISTENER_D = new SimpleEventListener();
+	static public Event EVENT_1 = new SimpleEvent();
+	static public Event EVENT_2 = new AnotherEvent();
+
 	/**
 	 * Create the test case
 	 * 
@@ -34,112 +38,97 @@ public class TestEventManager extends TestCase {
 	}
 
 	/**
-	 * Register single listener against single event class. Check the listener
-	 * will be called upon publish of same event.
+	 * Dry run publish when there are no listener registrations.
 	 */
-	public void testListenerForClassEvent() {
+	public void testNoRegistrations() {
 		EventManager em = new EventManager();
-
-		// register a listener for an event class
-		em.registerListener(EVENT_LISTENER_A, new Class<?>[] { SimpleEvent.class });
-		// register a listener for an other class
-		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { AnotherEvent.class });
-
-		// get the listeners
-		List<EventListener> listeners = em.getListenersForEvent(new SimpleEvent());
-
-		// check we got the correct one
-		System.out.println("for class listener size=" + listeners.size());
-		assertTrue(listeners.size() == 1 && listeners.get(0) == EVENT_LISTENER_A);
+		em.publish(EVENT_1);
 	}
 
 	/**
-	 * Register single listener against no class. Check the listener will be
-	 * called upon publish of any event/
+	 * Register 2 listener for different events. Check the correct listener will
+	 * be called on publish of an event.
+	 */
+	public void testListenerForEvent() {
+		EventManager em = new EventManager();
+
+		// register listeners for 2 different events
+		em.registerListener(EVENT_LISTENER_A, new Class<?>[] { EVENT_1.getClass() });
+		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { EVENT_2.getClass() });
+		em.registerListener(EVENT_LISTENER_C, new Class<?>[] { EVENT_2.getClass() });
+
+		// check the listeners for 1 event
+		List<EventListener> listeners = em.getListenersForEvent(EVENT_1);
+		assertTrue(listeners.size() == 1);
+		assertTrue(listeners.contains(EVENT_LISTENER_A));
+
+		// check the listeners for other event
+		List<EventListener> listeners2 = em.getListenersForEvent(EVENT_2);
+		assertTrue(listeners2.size() == 2);
+		assertTrue(listeners2.contains(EVENT_LISTENER_B));
+		assertTrue(listeners2.contains(EVENT_LISTENER_C));
+	}
+
+	/**
+	 * Register some listeners including listeners for all events. Check the all
+	 * events listeners will be called on publish of an event
 	 */
 	public void testListenerForClasslessEvent() {
 		EventManager em = new EventManager();
 
-		// register a listener for an event class
 		em.registerListener(EVENT_LISTENER_A, new Class<?>[] {});
-		// register a listener for an other class
-		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { YetAnotherEvent.class });
-		// register a listener for no class
-		em.registerListener(EVENT_LISTENER_C, new Class<?>[] { AnotherEvent.class });
+		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { EVENT_1.getClass() });
+		em.registerListener(EVENT_LISTENER_C, new Class<?>[] { EVENT_2.getClass() });
 
-		// get the listeners
-		List<EventListener> listeners = em.getListenersForEvent(new SimpleEvent());
+		// check listeners for one all events listener
+		List<EventListener> listeners = em.getListenersForEvent(EVENT_1);
+		assertTrue(listeners.size() == 2);
+		assertTrue(listeners.contains(EVENT_LISTENER_A));
+		assertTrue(listeners.contains(EVENT_LISTENER_B));
 
-		// check we go the correct one
-		assertTrue(listeners.size() == 1 && listeners.get(0) == EVENT_LISTENER_A);
+		// check listeners for multiple all events listener
+		em.registerListener(EVENT_LISTENER_D, new Class<?>[] {});
+		List<EventListener> listeners2 = em.getListenersForEvent(EVENT_2);
+		assertTrue(listeners2.size() == 3);
+		assertTrue(listeners2.contains(EVENT_LISTENER_A));
+		assertTrue(listeners2.contains(EVENT_LISTENER_C));
+		assertTrue(listeners2.contains(EVENT_LISTENER_D));
 	}
 
 	/**
-	 * Register 1 listener with an event class, and 1 listener without an event
-	 * class, and 1 listener with an irrelevant event class
+	 * Register assorted listeners and then check that they deregister
 	 */
-	public void testListenerForAssortedEvents() {
+	public void testDeregisterSpecificEventListener() {
 		EventManager em = new EventManager();
 
-		// register a listener for an event class
-		em.registerListener(EVENT_LISTENER_A, new Class<?>[] { SimpleEvent.class});
-		// register a listener for an other class
-		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { AnotherEvent.class });
-		// register a listener for no class
-		em.registerListener(EVENT_LISTENER_C, new Class<?>[] {});
+		em.registerListener(EVENT_LISTENER_A, new Class<?>[] {});
+		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { EVENT_1.getClass() });
+		em.registerListener(EVENT_LISTENER_C, new Class<?>[] { EVENT_2.getClass() });
 
-		// get all listeners for event
-		List<EventListener> listeners = em.getListenersForEvent(new SimpleEvent());
+		// confirm listener is registered then deregistered
+		assertTrue(em.getListenersForEvent(EVENT_1).contains(EVENT_LISTENER_B));
+		em.deregisterListener(EVENT_LISTENER_B);
+		assertFalse(em.getListenersForEvent(EVENT_1).contains(EVENT_LISTENER_B));
+		assertTrue(em.getListenersForEvent(EVENT_1).contains(EVENT_LISTENER_A));
 
-		// check we got the correct ones
-		assertTrue(listeners.size() == 2 && listeners.contains(EVENT_LISTENER_A)
-				&& listeners.contains(EVENT_LISTENER_C));
 	}
 
 	/**
-	 * Register a listener a class, then check it deregisters
+	 * Register assorted listeners and then check that they deregister
 	 */
-	public void testDeregisterClassEventListener() {
+	public void testDeregisterAllEventListener() {
 		EventManager em = new EventManager();
 
-		// register a listener for an event class
-		em.registerListener(EVENT_LISTENER_A, new Class<?>[] { SimpleEvent.class});
-		// register a listener for an other class
-		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { AnotherEvent.class });
-		// register a listener for no class
-		em.registerListener(EVENT_LISTENER_C, new Class<?>[] {});
+		em.registerListener(EVENT_LISTENER_A, new Class<?>[] {});
+		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { EVENT_1.getClass() });
+		em.registerListener(EVENT_LISTENER_C, new Class<?>[] { EVENT_2.getClass() });
 
-		SimpleEvent simpleEvent = new SimpleEvent();
-		List<EventListener> listenersBeforeDereg = em.getListenersForEvent(simpleEvent);
+		// confirm listener is registered then deregistered
+		assertTrue(em.getListenersForEvent(EVENT_1).contains(EVENT_LISTENER_A));
 		em.deregisterListener(EVENT_LISTENER_A);
-		List<EventListener> listenersAfterDereg = em.getListenersForEvent(simpleEvent);
+		assertFalse(em.getListenersForEvent(EVENT_1).contains(EVENT_LISTENER_A));
+		assertTrue(em.getListenersForEvent(EVENT_1).contains(EVENT_LISTENER_B));
 
-		// check we unregistered correctly
-		assertTrue(listenersBeforeDereg.contains(EVENT_LISTENER_A)
-				&& !listenersAfterDereg.contains(EVENT_LISTENER_A));
-	}
-
-	/**
-	 * Register a listener a class, then check it deregisters
-	 */
-	public void testDeregisterClasslessEventListener() {
-		EventManager em = new EventManager();
-
-		// register a listener for an event class
-		em.registerListener(EVENT_LISTENER_A, new Class<?>[] { SimpleEvent.class});
-		// register a listener for an other class
-		em.registerListener(EVENT_LISTENER_B, new Class<?>[] { AnotherEvent.class });
-		// register a listener for no class
-		em.registerListener(EVENT_LISTENER_C, new Class<?>[] {});
-
-		SimpleEvent simpleEvent = new SimpleEvent();
-		List<EventListener> listenersBeforeDereg = em.getListenersForEvent(simpleEvent);
-		em.deregisterListener(EVENT_LISTENER_C);
-		List<EventListener> listenersAfterDereg = em.getListenersForEvent(simpleEvent);
-
-		// check we go the correct one
-		assertTrue(listenersBeforeDereg.contains(EVENT_LISTENER_C)
-				&& !listenersAfterDereg.contains(EVENT_LISTENER_C));
 	}
 
 	/**
@@ -150,12 +139,11 @@ public class TestEventManager extends TestCase {
 
 		EventManager em = new EventManager();
 
-		// one class specific listener
 		em.registerListener(new SimpleEventListener(), new Class[] { SimpleEvent.class });
-		// one no class listener (responds to all events)
 		em.registerListener(new SimpleEventListener(), new Class[] {});
 
 		em.publish(new SimpleEvent());
+		em.publish(new AnotherEvent());
 
 		assertTrue(true);
 	}
